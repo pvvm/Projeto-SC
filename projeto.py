@@ -28,63 +28,61 @@ def miller_rabin(num_aleat, rounds):
 
     return True
 
-def inverso_modular(e, n):
-    a = 0
-    b = n
-    u = 1
-    while e > 0:
-        q = b // e
-        e, a, b, u = b % e, u, e, a - q * u
-    if b == 1:
-        return a % n
+#def inverso_modular(e, n):
+#    a = 0
+#    b = n
+#    u = 1
+#    while e > 0:
+#        q = b // e
+#        e, a, b, u = b % e, u, e, a - q * u
+#    if b == 1:
+#        return a % n
+
+def hash_G(r):
+    G = hashlib.sha3_384()
+    G.update(str(bin(r))[2:].encode())
+    return int(G.hexdigest(), 16)
+
+def hash_H(padded_m):
+    H = hashlib.sha3_224()
+    H.update(str(bin(padded_m))[2:].encode())
+    return int(H.hexdigest(), 16)
+    
 
 def oaep(binary_m):
-    #print(bin(binary_m))
-    k0 = 24
-    k1 = 57      # VER SE O K1 PODE SER TAO PEQUENO, JÁ QUE O DIGEST PODE SER ATÉ 64 BYTES
-    tamanho_m_k1 = len(bin(binary_m)) - 2 + k1
-    print(tamanho_m_k1)
+    k0 = 224
+    k1 = 132
 
-    padded_m = binary_m << k1   # Padding de m com k1 bits 0
+    padded_m = binary_m << k1
+    #print('padded: ', hex(padded_m))
 
-    encoded_p_m = str(padded_m).encode()
     r = random.getrandbits(k0)
-    print(r)
-    G = hashlib.blake2b(digest_size=int(tamanho_m_k1/8))     # Funcao Hash G
-    G.update(str(bin(r))[2:].encode())
-    print(G.hexdigest())
-    G.update(str(bin(r))[2:].encode())
-    print(G.hexdigest())
-    G.update(str(bin(r))[2:].encode())
-    print(G.hexdigest())
-    while len(bin(int(G.hexdigest(), 16))) != tamanho_m_k1: # ENCONTRAR UM HASH QUE POSSA DEFINIR UM TAMANHO FIXO
-        G.update(str(bin(r))[2:].encode())
-    X = padded_m ^ int(G.hexdigest(), 16)
 
-    print(bin(X))
 
-    H = hashlib.blake2b(digest_size=int(k0/8))
-    H.update(str(bin(padded_m))[2:].encode())
-    while len(bin(int(H.hexdigest(), 16))) != k0:
-        H.update(str(bin(padded_m))[2:].encode())
-    Y = r ^ int(H.hexdigest(), 16)
+    X = padded_m ^ hash_G(r)
+    #print('r:', hex(r))
+
+    Y = r ^ hash_H(X)
 
     return X, Y
 
 def reverse_oaep(X, Y):
-    k0 = 20
-    k1 = 57
-    H = hashlib.blake2b(digest_size=int(k0/8))
-    H.update(str(bin(X))[2:].encode())
-    while len(bin(int(H.hexdigest(), 16))) != k0:
-        print(len(bin(int(H.hexdigest(), 16))))
-        H.update(str(bin(X))[2:].encode())
-    r = Y ^ int(H.hexdigest(), 16)
-    print(r)
+    k1 = 132
+    r = Y ^ hash_H(X)
+    #print('r ver = ', hex(r))
 
+    padded_m = X ^ hash_G(r)
+    #print('padded_m ver = ', hex(padded_m))
+
+    m = padded_m >> k1
+    return hex(m)
+
+
+# Função que gera chaves privada e pública a partir de determinado tamanho de bits
 def gera_chave(tamanho):
     n = 0
-    while len(str(bin(n))) != 1024:
+    # São gerados novos primos até que seu produto tenha tamanho de bits igual a entrada desta função
+    while len(str(bin(n))) - 2 != tamanho:
         cont = 0
         primos = []
         while cont < 2:
@@ -94,34 +92,40 @@ def gera_chave(tamanho):
                 primos.append(num_aleat)
                 cont += 1
         n = primos[0] * primos[1]
-        #print(len(str(bin(n))))
 
     phi = (primos[0] - 1) * (primos[1] - 1)
-    
     e = 65537
     #e = random.randrange(2, phi)
     #while math.gcd(e, phi) != 1:
     #    e = random.randrange(2, phi)
 
-    d = inverso_modular(e, n)
+    d = pow(e, -1, phi)
     chave_pk = [n, e]
     chave_sk = [n, d]
     return chave_pk, chave_sk
 
 pk, sk = gera_chave(1024)
-#print(pk, sk)
 
 with open('mensagem.txt', 'r') as file:
     mensagem = file.read().replace('\n', '')
-#print(mensagem)
+
 encoded_m = mensagem.encode()
-#print(encoded_m)
-hashed_m = hashlib.sha3_224(encoded_m)
-print(hashed_m.hexdigest())
+hashed_m = hashlib.sha3_256(encoded_m)
 
-binary_h_m = int.from_bytes(hashed_m.hexdigest().encode(), 'big')
-#print(binary_h_m)
-#print(binary_h_m.to_bytes((binary_h_m.bit_length() + 7) // 8, 'big').decode())
-X, Y = oaep(binary_h_m)
+X, Y = oaep(int(hashed_m.hexdigest(), 16))
+print(X, Y)
+result_oaep = str(X) + str(Y)
 
-#reverse_oaep(X, Y)
+assinatura = pow(int(result_oaep), sk[1], sk[0])
+
+check_oaep = pow(assinatura, pk[1], pk[0])
+check_oaep = str(check_oaep)
+
+print(int(check_oaep[0:len(str(X))]), int(check_oaep[len(str(X)):]))
+
+hashed_m_oaep = reverse_oaep(int(check_oaep[0:len(str(X))]), int(check_oaep[len(str(X)):]))
+
+if hashed_m_oaep == hex(int(hashed_m.hexdigest(), 16)):
+    print('Assinatura válida :)')
+else:
+    print('Sai daqui, seu bandido safado >:(')
