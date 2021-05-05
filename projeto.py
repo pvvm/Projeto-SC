@@ -1,6 +1,7 @@
 import random
 import math
 import hashlib
+import base64
 
 # Função que determina se um número é provavelmente um primo ou se é composto
 def miller_rabin(num_aleat, rounds):
@@ -102,10 +103,9 @@ def reverse_oaep(X, Y):
     m = padded_m >> k1
     return hex(m)
 
-def gera_assinatura(mensagem, sk):
-    # Codifica a mensagem e passa ela por uma função hash SHA-3
-    encoded_m = mensagem.encode()
-    hashed_m = hashlib.sha3_256(encoded_m)
+def gera_assinatura(base64_dados_codificados, sk):
+
+    hashed_m = hashlib.sha3_256(base64_dados_codificados)
     print('Hash da mensagem:\n', bin(int(hashed_m.hexdigest(), 16)), '\n')
 
     # Realiza o esquema OAEP para tirar a propriedade determinística de RSA
@@ -119,7 +119,7 @@ def gera_assinatura(mensagem, sk):
     # Cria a assinatura usando a mensagem com padding e a chave privada
     return pow(result_oaep, sk[1], sk[0]), len(str(bin(X)))
 
-def verifica_assinatura(mensagem, assinatura, pk, tam_X):
+def verifica_assinatura(base64_dados_codificados, assinatura, pk, tam_X):
     k0 = 224
 
     # Verifica a assinatura usando a chave pública
@@ -130,8 +130,7 @@ def verifica_assinatura(mensagem, assinatura, pk, tam_X):
 
     # Reverte a mensagem com padding para a original
     hashed_m_oaep = reverse_oaep(int(bin(check_oaep)[2:tam_X], 2) , int(bin(check_oaep)[tam_X:], 2))
-    encoded_m = mensagem.encode()
-    m_hashed = hashlib.sha3_256(encoded_m)
+    m_hashed = hashlib.sha3_256(base64_dados_codificados)
 
     print('Valor a ser verificado:\n', bin(int(hashed_m_oaep, 16)))
     print('Hash da mensagem:\n',bin(int(m_hashed.hexdigest(), 16)))
@@ -151,14 +150,17 @@ print('Chave privada:\n', sk, '\n')
 
 print('\n-------- ASSINATURA --------\n')
 
-with open('mensagem.txt', 'r') as file:
-    mensagem = file.read().replace('\n', '')
-print('Mensagem lida:', mensagem, '\n')
+print('Nome do arquivo: video-teste.mp4\n')
 
-assinatura, tam_X = gera_assinatura(mensagem, sk)
+with open('video-teste.mp4', 'rb') as binary_file:
+    dados_arquivo = binary_file.read()
+    base64_dados_codificados = base64.b64encode(dados_arquivo)
+print('Arquivo em base64:', base64_dados_codificados, '\n')
+
+assinatura, tam_X = gera_assinatura(base64_dados_codificados, sk)
 
 print('Assinatura:\n', bin(assinatura), '\n')
 
 print('\n-------- VERIFICAÇÃO --------\n')
 
-verifica_assinatura(mensagem, assinatura, pk, tam_X)
+verifica_assinatura(base64_dados_codificados, assinatura, pk, tam_X)
