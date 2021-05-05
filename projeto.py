@@ -74,17 +74,16 @@ def hash_H(padded_m):
     
 # Função que realiza o esquema de padding OAEP
 def oaep(m):
-    # Tamanho n = 256 + 132 + 224
+    # Tamanho n = 256 + 128 + 224
     # Tamanho hash(m) = 256
     k0 = 224
-    k1 = 132
+    k1 = 128
 
     # Realiza o padding de k1 bits na mensagem
     padded_m = m << k1
 
     # Escolhe um número randômico de k0 bits
     r = random.getrandbits(k0)
-
     X = padded_m ^ hash_G(r)
     Y = r ^ hash_H(X)
 
@@ -93,7 +92,7 @@ def oaep(m):
 
 # Função que reverte o esquema OAEP para receber a mensagem original
 def reverse_oaep(X, Y):
-    k1 = 132
+    k1 = 128
     r = Y ^ hash_H(X)
     ##print('r ver = ', hex(r))
 
@@ -150,9 +149,9 @@ print('Chave privada:\n', sk, '\n')
 
 print('\n-------- ASSINATURA --------\n')
 
-print('Nome do arquivo: video-teste.mp4\n')
+print('Nome do arquivo: mensagem.txt\n')
 
-with open('video-teste.mp4', 'rb') as binary_file:
+with open('mensagem.txt', 'rb') as binary_file:
     dados_arquivo = binary_file.read()
     base64_dados_codificados = base64.b64encode(dados_arquivo)
 print('Arquivo em base64:', base64_dados_codificados, '\n')
