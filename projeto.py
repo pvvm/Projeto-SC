@@ -1,3 +1,10 @@
+"""
+Projeto de Segurança Computacional 2020/2
+Gerador/Verificação de Assinaturas RSA
+Pedro Vitor Valença Mizuno  -   17/0043665
+Vinícius Caixeta de Souza   -   18/0132199
+"""
+
 import random
 import math
 import hashlib
@@ -41,7 +48,7 @@ def gera_chave(tamanho):
         while cont < 2: 
             # São gerados dois primos que passem por 40 rodadas do teste de miller_rabin
             num_aleat = random.getrandbits(int(tamanho/2))
-            num_aleat |= (1 << int(tamanho/2) - 2 - 1) | 1
+            num_aleat |= (1 << int(tamanho/2) - 1) | 1
             if miller_rabin(num_aleat, 40) == True:
                 primos.append(num_aleat)
                 cont += 1
@@ -90,18 +97,6 @@ def oaep(m):
     # Retorna mensagem encriptografada de forma que não seja mais determinística
     return X, Y
 
-# Função que reverte o esquema OAEP para receber a mensagem original
-def reverse_oaep(X, Y):
-    k1 = 128
-    r = Y ^ hash_H(X)
-    ##print('r ver = ', hex(r))
-
-    padded_m = X ^ hash_G(r)
-    ##print('padded_m ver = ', hex(padded_m))
-
-    m = padded_m >> k1
-    return hex(m)
-
 def gera_assinatura(base64_dados_codificados, sk):
 
     hashed_m = hashlib.sha3_256(base64_dados_codificados)
@@ -113,19 +108,28 @@ def gera_assinatura(base64_dados_codificados, sk):
     print('X:\n', bin(X))
     print('Y:\n', bin(Y), '\n')
     result_oaep = (X << (len(bin(Y)) - 2)) | Y
-    print('X|Y:\n', bin(result_oaep), '\n')
+    print('X||Y:\n', bin(result_oaep), '\n')
 
     # Cria a assinatura usando a mensagem com padding e a chave privada
     return pow(result_oaep, sk[1], sk[0]), len(str(bin(X)))
 
+# Função que reverte o esquema OAEP para receber a mensagem original
+def reverse_oaep(X, Y):
+    k1 = 128
+    r = Y ^ hash_H(X)
+
+    padded_m = X ^ hash_G(r)
+
+    m = padded_m >> k1
+    return hex(m)
+
 def verifica_assinatura(base64_dados_codificados, assinatura, pk, tam_X):
-    k0 = 224
 
     # Verifica a assinatura usando a chave pública
     check_oaep = pow(assinatura, pk[1], pk[0])
     #check_oaep = str(check_oaep)
 
-    print('Recuperação do X|Y:\n', bin(check_oaep), '\n')
+    print('Recuperação do X||Y:\n', bin(check_oaep), '\n')
 
     # Reverte a mensagem com padding para a original
     hashed_m_oaep = reverse_oaep(int(bin(check_oaep)[2:tam_X], 2) , int(bin(check_oaep)[tam_X:], 2))
@@ -139,10 +143,19 @@ def verifica_assinatura(base64_dados_codificados, assinatura, pk, tam_X):
     else:
         print('\nSai daqui, seu bandido safado >:(\n')
 
+opcao = 0
+while not(opcao >= 1 and opcao <= 3):
+    opcao = int(input('Escolha o tamanho da chave:\n1) 1024 bits\n2) 2048 bits\n3) 4096 bits\n=> '))
+if opcao != 3:
+    opcao *= 1024
+else:
+    opcao = 4096
+
+arquivo = str(input("Digite o nome do arquivo junto com a extensão: "))
 
 print('\n-------- GERAÇÃO DE CHAVES --------\n')
 
-pk, sk = gera_chave(1024)
+pk, sk = gera_chave(opcao)
 
 print('Chave pública:\n', pk)
 print('Chave privada:\n', sk, '\n')
@@ -151,10 +164,10 @@ print('\n-------- ASSINATURA --------\n')
 
 print('Nome do arquivo: mensagem.txt\n')
 
-with open('mensagem.txt', 'rb') as binary_file:
+with open(arquivo, 'rb') as binary_file:
     dados_arquivo = binary_file.read()
     base64_dados_codificados = base64.b64encode(dados_arquivo)
-print('Arquivo em base64:', base64_dados_codificados, '\n')
+print('Arquivo em base64:', str(base64_dados_codificados)[2:-1], '\n')
 
 assinatura, tam_X = gera_assinatura(base64_dados_codificados, sk)
 
